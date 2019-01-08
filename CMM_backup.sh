@@ -290,8 +290,8 @@ if [ -e "/etc/centminmod" ]; then
                         echo -e $YELLOW"Select From Below options:"$RESET
                         echo " "
                         echo -e $GREEN"1) Do You Want Make Local Backup e.g /home/backup"$RESET
-                        echo -e $GREEN"2) Create Amazon S3 Backup"$RESET
-                        echo -e $GREEN"3) Make Remote FTP Backup"$RESET
+                        echo -e $GREEN"2) Create Amazon S3 Backup (Work in Progress)"$RESET
+                        echo -e $GREEN"3) Make Remote FTP Backup (Work in Progress)"$RESET
                         echo -e $GREEN"4} Restore Backup From Local"$RESET
                         echo -e $GREEN"5) Exit"$RESET
                         echo "#?"
@@ -309,13 +309,11 @@ if [ -e "/etc/centminmod" ]; then
                                         echo " "
                                         echo -e $BLINK"Make Amazon S3 Backup (Work in Progress)"$RESET
                                         echo " "
-                                        echo -e $RED"Amazon S3 Backup Coming Soon.."$RESET
 
                                 elif [ "$input" = '3' ]; then
                                         echo " "
                                         echo -e $BLINK"Make FTP Backup (Work in Progress)"$RESET
                                         echo " "
-                                        echo -e $RED"FTP Backup Coming Soon.."$RESET
 
                                 elif [ "$input" = '4' ]; then
                                         echo " "
