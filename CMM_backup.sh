@@ -29,36 +29,60 @@ echo -e "$GREEN*****************************************************************
 
 echo " "
 
+
+
+function backup_all_db
+{
+        time=$(date +"%m_%d_%Y-%H.%M.%S")
+        mkdir -p /home/backup
+        mkdir -p /home/backup/$time/mysql
+        mkdir -p /home/backup/$time/files
+        password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
+        dbs=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$')
+                if [ $? = '0' ]; then
+                        for db in $dbs; do
+                        echo -e $YELLOW"Full Database Backup in Progress"$RESET
+                        sleep 5
+                        xyz=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$' | wc -l)
+                                for ((x=1; x<$xyz; x++)); do
+                                        /usr/bin/mysqldump -u root --password=$password $db | gzip > /home/backup/$time/mysql/$db.sql.gz
+                                        x=$((x + 1))
+                                        echo -e $GREEN"Database Backup Completed in /home/backup/$time/mysql/$db.sql.gz"$RESET
+                                        echo " "
+                                done
+                        done
+                else
+                        echo -e $RED"Database Connection Failed. Please check Your Database Password in /root/.my.cnf File"$RESET
+                        echo " "
+                        exit
+                fi
+
+}
+
+
+function backup_all_files_uncompressed
+{
+echo " "
+echo -e $GREEN"Making Files Backup"$RESET
+echo " "
+rsync -vr /home/nginx/domains/* /home/backup/$time/files/
+echo " "
+echo -e $GREEN"All Files Backup Completed in /home/backup/$time/files/"$RESET
+echo " "
+}
+
         case $1 in
 
+
+
+
                 -f )
-
-                        password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
-
-                        dbs=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$')
-                        if [ $? = '0' ]; then
-                                for db in $dbs; do
-                                        echo -e $YELLOW"Full Database Backup in Progress"$RESET
-                                        sleep 5
-                                        xyz=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$' | wc -l)
-                                                for ((x=1; x<$xyz; x++)); do
-                                                        time=$(date +"%m_%d_%Y-%H.%M.%S")
-                                                        /usr/bin/mysqldump -u root --password=$password $db | gzip > /home/$db-$time.sql.gz
-                                                        x=$((x + 1))
-                                                        echo -e $GREEN"Database Backup Completed in /home/$db-$time.sql.gz"$RESET
-                                                        echo " "
-                                        done
-                                done
-                        else
-                                echo -e $RED"Database Connection Failed. Please check Your Database Password in /root/.my.cnf File"$RESET
-                                echo " "
-                        fi
+                        backup_all_db
                         exit
                 ;;
 
                 -u )
                         password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
-
                         dbs=$(mysql -u root --skip-column-names -B -N -e "SHOW DATABASES LIKE '$2'")
                                 if [ "$dbs" == "$2"  ]; then
                                         echo " "
@@ -69,9 +93,20 @@ echo " "
                                         echo -e $GREEN"Database Backup Completed /home/$dbs-$time.sql.gz"$RESET
                                         echo " "
                                 else
-                                echo -e $RED"Database Not Found. Please Recheck"$RESET
-                                echo " "
+                                        echo -e $RED"Database Not Found. Please Recheck"$RESET
+                                        echo " "
                                 fi
+
+                        exit
+                ;;
+
+
+                -b )
+                        echo " "
+                        echo "Backup All Files and Database"
+                        echo " "
+                        backup_all_db
+                        backup_all_files_uncompressed
                         exit
                 ;;
 
@@ -83,7 +118,10 @@ echo " "
                                 echo " "
                                 echo "-u DB_NAME | Make Single Database Backup"
                                 echo " "
+                                echo "-b | Backup All Database and Files Uncompressed"
+                                echo " "
                                 echo "-h | Help Section"
+                                echo " "
                                 exit
                 ;;
 
