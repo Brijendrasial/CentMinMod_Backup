@@ -63,6 +63,7 @@ echo " "
                                 if [ "$dbs" == "$2"  ]; then
                                         echo " "
                                         echo -e $YELLOW"Making Database Backup $dbs"$RESET
+                                        sleep 5
                                         time=$(date +"%m_%d_%Y-%H.%M.%S")
                                         /usr/bin/mysqldump -u root --password=$password $dbs | gzip > /home/$dbs-$time.sql.gz
                                         echo -e $GREEN"Database Backup Completed /home/$dbs-$time.sql.gz"$RESET
@@ -72,6 +73,18 @@ echo " "
                                 echo " "
                                 fi
                         exit
+                ;;
+
+                -h )
+
+                                echo "This is Help Section for CMM Backup by Brijendra Sial"
+                                echo " "
+                                echo "-f  | Force Full Database Backup Saved (/home/)"
+                                echo " "
+                                echo "-u DB_NAME | Make Single Database Backup"
+                                echo " "
+                                echo "-h | Help Section"
+                                exit
                 ;;
 
         esac
