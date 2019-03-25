@@ -9,4 +9,6 @@ domain.com-backup.conf - Where mysql details are saved.<br/>
 To make Full Database Backup <br/>
 ./CMM_backup.sh -f <br/><br/>
 To make Single Database Backup <br/>
-./CMM_backup.sh -u Database_Name <br/>
+./CMM_backup.sh -u Database_Name <br/><br/>
+To make Full files and Database Backup <br/>
+./CMM_backup.sh -b <br/>
