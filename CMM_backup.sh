@@ -29,6 +29,32 @@ echo -e "$GREEN*****************************************************************
 
 echo " "
 
+        case $1 in
+
+                fdb )
+
+                        password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
+
+                        dbs=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$')
+                        if [ $? = '0' ]; then
+                                for db in $dbs; do
+                                        echo -e $YELLOW"Full Database Backup in Progress"$RESET
+                                        sleep 5
+                                        xyz=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$' | wc -l)
+                                                for ((x=1; x<$xyz; x++)); do
+                                                        time=$(date +"%m_%d_%Y-%H.%M.%S")
+                                                        /usr/bin/mysqldump -u root --password=$password $db | gzip > /home/$db-$time.sql.gz
+                                                        x=$((x + 1))
+                                                        echo -e $GREEN"Database Backup Completed in /home/$db-$time.sql.gz"$RESET
+                                                        echo " "
+                                        done
+                                done
+                        else
+                                echo -e $RED"Database Connection Failed. Please check Your Database Password in /root/.my.cnf File"$RESET
+                                echo " "
+                        fi
+                ;;
+        esac
 bs=1
 b=1
 bsc=1
