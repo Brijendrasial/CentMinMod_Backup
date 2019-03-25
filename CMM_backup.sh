@@ -53,6 +53,7 @@ echo " "
                                 echo -e $RED"Database Connection Failed. Please check Your Database Password in /root/.my.cnf File"$RESET
                                 echo " "
                         fi
+                        exit
                 ;;
 
                 -u )
@@ -70,6 +71,7 @@ echo " "
                                 echo -e $RED"Database Not Found. Please Recheck"$RESET
                                 echo " "
                                 fi
+                        exit
                 ;;
 
         esac
