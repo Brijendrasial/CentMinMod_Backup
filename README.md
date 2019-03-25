@@ -7,6 +7,6 @@ domain.com-ftp_path.conf - Where FTP details are saved. <br/>
 domain.com-backup.conf - Where mysql details are saved.<br/>
 
 To make Full Database Backup <br/>
-./CMM_backup.sh -f <br/>
+./CMM_backup.sh -f <br/><br/>
 To make Single Database Backup <br/>
 ./CMM_backup.sh -u Database_Name <br/>
