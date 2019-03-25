@@ -31,7 +31,7 @@ echo " "
 
         case $1 in
 
-                fdb )
+                -f )
 
                         password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
 
@@ -54,6 +54,24 @@ echo " "
                                 echo " "
                         fi
                 ;;
+
+                -u )
+                        password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
+
+                        dbs=$(mysql -u root --skip-column-names -B -N -e "SHOW DATABASES LIKE '$2'")
+                                if [ "$dbs" == "$2"  ]; then
+                                        echo " "
+                                        echo -e $YELLOW"Making Database Backup $dbs"$RESET
+                                        time=$(date +"%m_%d_%Y-%H.%M.%S")
+                                        /usr/bin/mysqldump -u root --password=$password $dbs | gzip > /home/$dbs-$time.sql.gz
+                                        echo -e $GREEN"Database Backup Completed /home/$dbs-$time.sql.gz"$RESET
+                                        echo " "
+                                else
+                                echo -e $RED"Database Not Found. Please Recheck"$RESET
+                                echo " "
+                                fi
+                ;;
+
         esac
 bs=1
 b=1
@@ -762,3 +780,4 @@ mkdir -p /usr/local/src/centminmod_backup
         else
                 create_path
         fi
+
