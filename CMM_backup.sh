@@ -12,7 +12,7 @@ WHITE='\e[97m'
 BLINK='\e[5m'
 
 #set -e
-#set -x
+set -x
 
 echo " "
 echo -e "$GREEN*******************************************************************************$RESET"
@@ -142,11 +142,118 @@ function create_path
         echo " "
         read -p "$(echo -e $GREEN"Enter Path Where You Want To Store Backups e.g /backup || /home/backup :"$RESET) " backup_path
         mkdir -p $backup_path
-        cat > /usr/local/src/centminmod_backup/backup_path.conf <<-EOF
+        cat > /usr/local/src/centminmod_backup/backup_path.conf <<EOF
         Backup_Path:$backup_path
-        EOF
+EOF
         echo " "
         start_display
+}
+
+
+function check_ssh_connection
+{
+        ssh -o PasswordAuthentication=no -i ~/.ssh/cmm.key $destination_ip /bin/true
+        if [ $? -eq 0 ]; then
+                echo " "
+                echo -e $GREEN"Passworless SSH Connection is successfully without Password."$RESET
+                echo " "
+                site_copy
+        else
+                echo " "
+                echo -e $RED"SSH Connection is not Possible.."$RESET
+                rm -rf ~/.ssh/cmm.key
+                read -p "$(echo -e $GREEN"Enter Destination Root Password:"$RESET) " destination_password
+                ssh-keygen -t rsa -N "" -f ~/.ssh/cmm.key
+                #sshpass -p "$destination_password"  ssh -i ~/.ssh/cmm.key root@$destination_ip
+                sshpass -p "$destination_password" ssh-copy-id -i ~/.ssh/cmm.key root@$destination_ip
+                #ssh -i ~/.ssh/cmm.key root@$destination_ip
+                create_connection
+        fi
+
+}
+
+
+function create_connection
+{
+        echo " "
+        read -p "$(echo -e $GREEN"Enter Destination IP:"$RESET) " destination_ip
+        check_ssh_connection
+}
+
+function site_copy
+{
+        read -p "$(echo -e $GREEN"Enter Domain Your Want to Copy:"$RESET) " domain_name
+        if [ -f /home/nginx/domains/$domain_name/public/wp-config.php ]; then
+                echo " "
+                echo  -e $YELLOW"Wordpress Installation Found"$RESET
+                echo " "
+                echo "Moving Site In Progress"
+                if ssh -qnx -i ~/.ssh/cmm.key root@$destination_ip "test -d /home/nginx/domains/$domain_name" ; then
+                        echo " "
+                        echo -e $RED"Site already exist on Destination Server. Quitting copy"$RESET
+                        echo " "
+                        exit
+                else
+                        echo " "
+                        echo -e $GREEN"Site doesnt exist on Destination Server. Copying in Progress"$RESET
+                        echo " "
+                        ssh -qnx -i ~/.ssh/cmm.key root@$destination_ip "mkdir -p /home/nginx/domains/$domain_name"
+                        mkdir -p /home/nginx/domains/$domain_name/vhosts
+                        mkdir -p /home/nginx/domains/$domain_name/mysql
+                        mkdir -p /home/nginx/domains/$domain_name/ftp
+                        cp /usr/local/nginx/conf/conf.d/$domain_name* /home/nginx/domains/$domain_name/vhosts
+                        DATABASE_NAME=$(grep -ir "DB_NAME" /home/nginx/domains/$domain_name/public/wp-config.php | awk {'print $3'} | sed -n "s/^.*'\(.*\)'.*$/\1/ p")
+                        DATABASE_USER=$(grep -ir "DB_USER" /home/nginx/domains/$domain_name/public/wp-config.php | awk {'print $3'} | sed -n "s/^.*'\(.*\)'.*$/\1/ p")
+                        DATABASE_PASSWORD=$(grep -ir "DB_PASSWORD" /home/nginx/domains/$domain_name/public/wp-config.php | awk {'print $3'} | sed -n "s/^.*'\(.*\)'.*$/\1/ p")
+                        mysqldump -u $DATABASE_USER --password=$DATABASE_PASSWORD $DATABASE_NAME > /home/nginx/domains/$domain_name/mysql/$DATABASE_NAME.sql
+                        ftp_details=$(grep -ri "$domain_name" /etc/pure-ftpd/pureftpd.passwd)
+                        echo $ftp_details > /home/nginx/domains/$domain_name/ftp/pureftpd.passwd
+                        rsync -hrtplu  -e 'ssh -p 22 -i ~/.ssh/cmm.key' --ignore-existing --progress /home/nginx/domains/$domain_name root@$destination_ip:/home/nginx/domains/
+                        ssh -qnx -i ~/.ssh/cmm.key root@$destination_ip "chown -R nginx:nginx /home/nginx/domains/$domain_name"
+                        site_restore
+                fi
+        else
+                echo " "
+                echo -e $RED"Wordpress Installation Not Found"$RESET
+                echo " "
+        fi
+}
+
+function site_restore
+{
+        ROOT_PASSWORD=$(ssh -i ~/.ssh/cmm.key root@$destination_ip "cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2")
+        #ssh -i ~/.ssh/cmm.key root@$destination_ip "mysql -u root -p$ROOT_PASSWORD -e 'DROP USER $DATABASE_USER@localhost;'"
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "mysql -u root -p$ROOT_PASSWORD -e 'CREATE DATABASE $DATABASE_NAME /*\!40100 DEFAULT CHARACTER SET utf8 */;'"
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "mysql -u root -p$ROOT_PASSWORD -e 'CREATE USER '$DATABASE_USER'@'localhost' IDENTIFIED BY \"$DATABASE_PASSWORD\";'"
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "mysql -u root -p$ROOT_PASSWORD -e 'GRANT ALL PRIVILEGES ON $DATABASE_NAME.* TO '$DATABASE_USER'@'localhost';'"
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "mysql -u root -p$ROOT_PASSWORD -e 'FLUSH PRIVILEGES;'"
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "mysql -u $DATABASE_USER --password=$DATABASE_PASSWORD $DATABASE_NAME < /home/nginx/domains/$domain_name/mysql/$DATABASE_NAME.sql"
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "cp /home/nginx/domains/$domain_name/vhosts/* /usr/local/nginx/conf/conf.d/"
+        FTP_USER=$(ssh -i ~/.ssh/cmm.key root@$destination_ip "cat /home/nginx/domains/$domain_name/ftp/pureftpd.passwd | cut -d":" -f1")
+        RANDOM_PASS=$(ssh -i ~/.ssh/cmm.key root@$destination_ip "pwgen 8 1")
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "(echo $RANDOM_PASS;echo $RANDOM_PASS) | pure-pw useradd $FTP_USER -u nginx -g nginx -d /home/nginx/domains/$domain_name"
+        ssh -i ~/.ssh/cmm.key root@$destination_ip "pure-pw mkdb"
+        echo " "
+        echo "New FTP Password is $RANDOM_PASS"
+        echo " "
+        echo -e $GREEN"Restore is Successfull"$RESET
+        echo " "
+}
+
+function site_migration
+{
+        echo " "
+        if  rpm -q sshpass > /dev/null ; then
+                echo -e $YELLOW"sshpass Installation Found. Skipping Its Installation"$RESET
+                create_connection
+        else
+        echo -e $RED"sshpass Installation Not Found. Installing it"$RESET
+        echo " "
+        yum install sshpass -y
+        echo " "
+        create_connection
+        fi
+
 }
 
 
@@ -164,9 +271,9 @@ function ftp_backup_restore
                 cfz=$(lftp -c "open -u $FTP_USER,$FTP_PASSWORD $FTP_HOST; ls $bsss" | awk '{print $9}' | sed -r '/^\s*$/d' | wc -l)
                 for ((j=2; j<$cfz; j++)); do
                         display_backup_files=$(lftp -c "open -u $FTP_USER,$FTP_PASSWORD $FTP_HOST; ls -lht $bsss" | awk '{print $9}' | sed -r '/^\s*$/d' | sed -n $bb'p')
-                        cat >> /usr/local/src/centminmod_backup/backup-list.conf<<-EOF
+                        cat >> /usr/local/src/centminmod_backup/backup-list.conf<<EOF
                         $cc) $display_backup_files
-                        EOF
+EOF
                         cc=$((cc + 1))
                 done
         done
@@ -256,9 +363,9 @@ function local_backup_restore
                 cf=$(ls -lht $bss | awk '{print $9}' | sed -r '/^\s*$/d' | wc -l)
                 for ((i=0; i<$cf; i++)); do
                         display_backup_files=$(ls -lht $bss | awk '{print $9}' | sed -r '/^\s*$/d' | sed -n $b'p')
-                        cat >> /usr/local/src/centminmod_backup/backup-list.conf<<-EOF
+                        cat >> /usr/local/src/centminmod_backup/backup-list.conf<<EOF
                         $b) $display_backup_files
-                        EOF
+EOF
                         b=$((b + 1))
                 done
         done
@@ -356,12 +463,12 @@ function local_backup_auto
         echo "Creating Database Backup"
         mysqldump -u $pre_database_user -p$pre_database_password $pre_database_name > $pre_backup_path/$backup_domain/mysql/$pre_database_name.sql
 
-        cat > $pre_backup_path/$backup_domain/mysql/mysql.conf<<-EOF
+        cat > $pre_backup_path/$backup_domain/mysql/mysql.conf<<EOF
         Domain_Name:$backup_domain
         Database_Name:$pre_database_name
         Database_User:$pre_database_user
         Database_Password:$pre_database_password
-        EOF
+EOF
 
         mkdir -p $pre_backup_path/$backup_domain/ftp_path
         rsync -vr /usr/local/src/centminmod_backup/$backup_domain-ftp_path.conf $pre_backup_path/$backup_domain/ftp_path/
@@ -428,12 +535,12 @@ function local_dir_db_backup
                 echo "Creating Database Backup"
                 mysqldump -u $backup_domain_user -p$backup_domain_password $backup_domain_database > $backup_path/$backup_domain/mysql/$backup_domain_database.sql
 
-                cat > $backup_path/$backup_domain/mysql/mysql.conf<<-EOF
+                cat > $backup_path/$backup_domain/mysql/mysql.conf<<EOF
                 Domain_Name:$backup_domain
                 Database_Name:$backup_domain_database
                 Database_User:$backup_domain_user
                 Database_Password:$backup_domain_password
-                EOF
+EOF
 
                 mkdir -p $backup_path/$backup_domain/ftp_path
                 rsync -vr /usr/local/src/centminmod_backup/$backup_domain-ftp_path.conf $backup_path/$backup_domain/ftp_path/
@@ -446,12 +553,12 @@ function local_dir_db_backup
 
                 echo " "
 
-                cat > /usr/local/src/centminmod_backup/$backup_domain-backup.conf<<-EOF
+                cat > /usr/local/src/centminmod_backup/$backup_domain-backup.conf<<EOF
                 Domain_Name:$backup_domain
                 Database_Name:$backup_domain_database
                 Database_User:$backup_domain_user
                 Database_Password:$backup_domain_password
-                EOF
+EOF
 
 
                 echo -e $GREEN"Backup Entries Saved in /usr/local/src/centminmod_backup/$backup_domain-backup.conf"$RESET
@@ -549,9 +656,9 @@ function amazon_backup_check
                         echo "Bucket Not Found. Create New Bucket"
                         read -p "$(echo -e $GREEN"Enter Bucket Name:"$RESET) " bucket_name
                         aws s3 mb s3://$bucket_name
-                        cat > /usr/local/src/centminmod_backup/bucket_name.conf <<-EOF
+                        cat > /usr/local/src/centminmod_backup/bucket_name.conf <<EOF
                         Bucket_Name:$bucket_name
-                        EOF
+EOF
                         echo " "
                         echo "Bucket Created"
                 else
@@ -652,12 +759,12 @@ function ftp_backup_config
         read -p "$(echo -e $GREEN"Enter FTP user:"$RESET) " ftp_user
         read -p "$(echo -e $GREEN"Enter FTP password:"$RESET) " ftp_password
 
-        cat > /usr/local/src/centminmod_backup/$backup_domain-ftp_path.conf <<-EOF
+        cat > /usr/local/src/centminmod_backup/$backup_domain-ftp_path.conf <<EOF
         FTP_HOST:$ftp_host
         FTP_PATH:$ftp_path
         FTP_USER:$ftp_user
         FTP_PASSWORD:$ftp_password
-        EOF
+EOF
         ftp_connection_check
 }
 
@@ -677,7 +784,9 @@ function start_display
                                 echo " "
                                 echo -e $GREEN"4} Restore Backup From Local"$RESET
                                 echo " "
-                                echo -e $GREEN"5) Exit"$RESET
+                                echo -e $GREEN"5) Site Migration CMM Source to CMM Destination"$RESET
+                                echo " "
+                                echo -e $GREEN"6) Exit"$RESET
                                 echo "#?"
 
                                 read input
@@ -706,6 +815,12 @@ function start_display
                                                 local_backup_restore
 
                                         elif [ "$input" = '5' ]; then
+                                                echo " "
+                                                echo -e $BLINK"Site Migration from CMM to CMM"$RESET
+                                                echo " "
+                                                site_migration
+
+                                        elif [ "$input" = '6' ]; then
                                                 echo " "
                                                 echo -e $BLINK"Exiting"$RESET
                                                 echo " "
@@ -833,4 +948,3 @@ mkdir -p /usr/local/src/centminmod_backup
         else
                 create_path
         fi
-
