@@ -485,8 +485,7 @@ EOF
                         if [ $inputs = '1' ]; then
                                 echo " "
                                 echo "Sending Generated Backup CMMBACKUP-$backup_domain-$time.tar.gz to s3://$bucket_name"
-                                s3cmd put $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz s3://$bucket_name
-                                s3cmd put /usr/local/src/centminmod_backup/backup-path.conf s3://$bucket_name
+                                aws s3 cp $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz s3://$bucket_name
                                 echo " "
                                 echo "Backup Sent To Amazon s3://$bucket_name/$backup_domain-$time.tar.gz"
                                 echo " "
@@ -574,8 +573,7 @@ EOF
                         if [ $inputs = '1' ]; then
                                 echo " "
                                 echo "Sending Generated Backup CMMBACKUP-$backup_domain-$time.tar.gz to s3://$bucket_name"
-                                s3cmd put $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz s3://$bucket_name
-                                s3cmd put /usr/local/src/centminmod_backup/backup-path.conf s3://$bucket_name
+                                aws s3 cp $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz s3://$bucket_name
                                 echo " "
                                 echo "Backup Sent To Amazon s3://$bucket_name/$backup_domain-$time.tar.gz"
                                 echo " "
@@ -631,55 +629,58 @@ function local_disk_backup
                 fi
 }
 
-function amazon_check_software
-{
-echo -e $YELLOW"Checking If required Software is installed"$RESET
-echo " "
-        if  rpm -q awscli > /dev/null ; then
-                echo -e $GREEN"S3cmd Installation Found. Skipping Its Installation"$RESET
-                amazon_display
-        fi
-                echo -e $RED"s3cmd Installation Not Found. Installing it"$RESET
-                echo " "
-                yum install awscli -y
-                echo " "
-                amazon_display
-}
-
 function amazon_backup_check
 {
         echo " "
-        check_bucket_name=$(grep -i "Bucket_Name" /usr/local/src/centminmod_backup/bucket_name.conf | cut -d':' -f2)
-        check_bucket_names=$(aws s3api head-bucket --bucket $check_bucket_name)
-                if [ -z "$check_bucket_name" ]; then
-                        echo " "
-                        echo "Bucket Not Found. Create New Bucket"
-                        read -p "$(echo -e $GREEN"Enter Bucket Name:"$RESET) " bucket_name
-                        aws s3 mb s3://$bucket_name
-                        cat > /usr/local/src/centminmod_backup/bucket_name.conf <<EOF
-                        Bucket_Name:$bucket_name
-EOF
-                        echo " "
-                        echo "Bucket Created"
-                else
+        bucket_name=$(grep -i "Bucket_Name" /usr/local/src/centminmod_backup/bucket_name.conf | cut -d':' -f2)
+        check_bucket_names=$(aws s3api head-bucket --bucket $check_bucket_name 2> /tmp/bullten)
+        if [ -z /tmp/bullten ]; then
                         echo " "
                         echo "Bucket Found. Creating Backup"
-                fi
+                        local_disk_backup
+                else
+                        echo " "
+                        echo "Bucket Not Found. Creating Bucket"
+                        aws s3 mb s3://$check_bucket_name
+                        local_disk_backup
+        fi
 
-        s3cmd_config_check=$(grep -i "ERROR: S3 error: 403" /tmp/sial)
 }
 
-function amazon_s3cmd_config
+function amazon_aws_config
 {
-        read -p "$(echo -e $GREEN"Enter Access Key:"$RESET) " access_key
-        read -p "$(echo -e $GREEN"Enter Secret Key:"$RESET) " secret_key
-        read -p "$(echo -e $GREEN"Enter Bucket Location e.g US:"$RESET) " bucket_location
-        aws configure set aws_access_key_id $access_key
-        aws configure set aws_secret_access_key $secret_key
-        aws configure set output json --profile CMM
-        aws configure set region $bucket_location --profile CMM
-        aws configure set ca_bundle /etc/pki/tls/certs/ca-bundle.crt --profile CMM
-        amazon_backup_check
+        echo -e $YELLOW"Checking If required Software is installed"$RESET
+        echo " "
+        if  rpm -q awscli > /dev/null ; then
+                echo -e $GREEN"aws Installation Found. Skipping Its Installation"$RESET
+        else
+                echo -e $RED"aws Installation Not Found. Installing it"$RESET
+                echo " "
+                yum install awscli -y
+                echo " "
+        fi
+
+        read -p "$(echo -e $GREEN"Enter Bucket Name:"$RESET) " bucket_name
+        cat > /usr/local/src/centminmod_backup/bucket_name.conf <<EOF
+                        Bucket_Name:$bucket_name
+EOF
+        if aws s3api head-bucket --bucket $bucket_name > /dev/null ; then
+                echo " "
+                echo "Configuration is Working Fine. "
+                echo " "
+                amazon_display
+        else
+
+                read -p "$(echo -e $GREEN"Enter Access Key:"$RESET) " access_key
+                read -p "$(echo -e $GREEN"Enter Secret Key:"$RESET) " secret_key
+                read -p "$(echo -e $GREEN"Enter Bucket Location e.g US:"$RESET) " bucket_location
+                aws configure set aws_access_key_id $access_key
+                aws configure set aws_secret_access_key $secret_key
+                aws configure set output json --profile CMM
+                aws configure set region $bucket_location --profile CMM
+                aws configure set ca_bundle /etc/pki/tls/certs/ca-bundle.crt --profile CMM
+                amazon_backup_check
+        fi
 }
 
 
@@ -778,7 +779,7 @@ function start_display
                                 echo " "
                                 echo -e $GREEN"1) Do You Want Make Local Backup e.g [/home/backup]"$RESET
                                 echo " "
-                                echo -e $GREEN"2) Create or Restore Amazon S3 Backup i.e [s3://bucket_name] (To be done)"$RESET
+                                echo -e $GREEN"2) Create or Restore Amazon S3 Backup i.e [s3://bucket_name]"$RESET
                                 echo " "
                                 echo -e $GREEN"3) Make Remote FTP Backup"$RESET
                                 echo " "
@@ -799,9 +800,9 @@ function start_display
 
                                         elif [ "$input" = '2' ]; then
                                                 echo " "
-                                                echo -e $BLINK"Making Amazon S3 Backup (In Progress)"$RESET
+                                                echo -e $BLINK"Making Amazon S3 Backup"$RESET
                                                 echo " "
-                                                amazon_check_software
+                                                amazon_aws_config
 
                                         elif [ "$input" = '3' ]; then
                                                 echo " "
@@ -861,7 +862,7 @@ function amazon_display
                         echo " "
                         echo -e $BLINK"You Have Selected to Make Amazon Backup i.e [s3://BUCKET]"$RESET
                         time=$(date +"%m_%d_%Y-%H.%M.%S")
-                        amazon_backup_check
+                        local_disk_backup
 
                 elif [ "$inputs" = '2' ]; then
                         echo " "
