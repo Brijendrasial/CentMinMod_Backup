@@ -482,18 +482,30 @@ EOF
         echo " "
         echo " "
 
-                        if [ $inputs = '1' ]; then
+                        if [[ $inputs = '1' ]]; then
                                 echo " "
                                 echo "Sending Generated Backup CMMBACKUP-$backup_domain-$time.tar.gz to s3://$bucket_name"
                                 aws s3 cp $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz s3://$bucket_name
                                 echo " "
                                 echo "Backup Sent To Amazon s3://$bucket_name/$backup_domain-$time.tar.gz"
                                 echo " "
-                        elif [ $inputss = '1' ]; then
+                        elif [[ $inputss = '1' ]]; then
                                 echo " "
                                 echo "FTP Upload In Progress"
                                 echo " "
                                 lftp -c "open -u $FTP_USER,$FTP_PASSWORD $FTP_HOST; put -O $FTP_PATH $pre_backup_path/CMMBACKUP-$backup_domain-$time.tar.gz"
+
+                        elif [[ $inputss = '1' ]]; then
+                                echo " "
+                                echo "FTP Upload In Progress"
+                                echo " "
+                                lftp -c "open -u $FTP_USER,$FTP_PASSWORD $FTP_HOST; put -O $FTP_PATH $pre_backup_path/CMMBACKUP-$backup_domain-$time.tar.gz"
+
+                        elif [[ $input = '6' ]]; then
+                                echo " "
+                                echo "Uploading backup to gdrive"
+                                echo " "
+                                gdrive upload $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz
                         else
                                 echo "Exiting..."
                                 echo " "
@@ -570,18 +582,24 @@ EOF
 
                 rm -rf $backup_path/$backup_domain
 
-                        if [ $inputs = '1' ]; then
+                        if [[ $inputs = '1' ]]; then
                                 echo " "
                                 echo "Sending Generated Backup CMMBACKUP-$backup_domain-$time.tar.gz to s3://$bucket_name"
                                 aws s3 cp $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz s3://$bucket_name
                                 echo " "
                                 echo "Backup Sent To Amazon s3://$bucket_name/$backup_domain-$time.tar.gz"
                                 echo " "
-                        elif [ $inputss = '1' ]; then
+                        elif [[ $inputss = '1' ]]; then
                                 echo " "
                                 echo "FTP Upload In Progress"
                                 echo " "
                                 lftp -c "open -u $FTP_USER,$FTP_PASSWORD $FTP_HOST; put -O $FTP_PATH $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz"
+
+                        elif [[ $input = '6' ]]; then
+                                echo " "
+                                echo "Uploading backup to gdrive"
+                                echo " "
+                                gdrive upload $backup_path/CMMBACKUP-$backup_domain-$time.tar.gz
                         fi
         else
                 local_backup_auto
@@ -769,6 +787,22 @@ EOF
         ftp_connection_check
 }
 
+function gdrive_software_check
+{
+if [ -n /usr/bin/gdrive ]; then
+        echo " "
+        echo "gdrive Exist"
+        local_disk_backup
+else
+        echo " "
+        wget "https://docs.google.com/uc?id=0B3X9GlR6EmbnQ0FtZmJJUXEyRTA&export=download" -O /usr/bin/gdrive
+        chmod 777 /usr/bin/gdrive
+        echo " "
+        local_disk_backup
+fi
+}
+
+
 function start_display
 {
         if [ -e "/etc/centminmod" ]; then
@@ -787,7 +821,9 @@ function start_display
                                 echo " "
                                 echo -e $GREEN"5) Site Migration CMM Source to CMM Destination"$RESET
                                 echo " "
-                                echo -e $GREEN"6) Exit"$RESET
+                                echo -e $GREEN"6) Make Gdrive Backup"$RESET
+                                echo " "
+                                echo -e $GREEN"7) Exit"$RESET
                                 echo "#?"
 
                                 read input
@@ -822,6 +858,13 @@ function start_display
                                                 site_migration
 
                                         elif [ "$input" = '6' ]; then
+                                                echo " "
+                                                echo -e $BLINK"Making Gdrive Backup"$RESET
+                                                echo " "
+                                                time=$(date +"%m_%d_%Y-%H.%M.%S")
+                                                gdrive_software_check
+
+                                        elif [ "$input" = '7' ]; then
                                                 echo " "
                                                 echo -e $BLINK"Exiting"$RESET
                                                 echo " "
