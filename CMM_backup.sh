@@ -789,7 +789,7 @@ EOF
 
 function gdrive_software_check
 {
-if [ -n /usr/bin/gdrive ]; then
+if [ -f "/usr/bin/gdrive" ]; then
         echo " "
         echo "gdrive Exist"
         local_disk_backup
