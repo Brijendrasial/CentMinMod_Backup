@@ -12,7 +12,7 @@ WHITE='\e[97m'
 BLINK='\e[5m'
 
 #set -e
-#set -x
+set -x
 
 echo " "
 echo -e "$GREEN*******************************************************************************$RESET"
@@ -30,10 +30,29 @@ echo -e "$GREEN*****************************************************************
 echo " "
 
 BACKUP_PATH_DEFINED=/home/centminmodbackup
+MAX_BACKUPS=5
 time=$(date +"%m_%d_%Y-%H.%M.%S")
 mkdir -p $BACKUP_PATH_DEFINED
 mkdir -p $BACKUP_PATH_DEFINED/$time/mysql
 mkdir -p $BACKUP_PATH_DEFINED/$time/files
+
+
+function backup_retension
+{
+
+function number_of_backups() {
+    echo `ls -1 $BACKUP_PATH_DEFINED | wc -l`
+}
+
+function oldest_backup() {
+    echo -n `ls -1 $BACKUP_PATH_DEFINED | head -1`
+}
+
+while [[ $(number_of_backups) -gt $MAX_BACKUPS ]]; do
+    rm -rf "$BACKUP_PATH_DEFINED/$(oldest_backup)"
+done
+}
+
 
 function backup_all_db
 {
@@ -77,6 +96,7 @@ echo " "
 
                 -f )
                         backup_all_db
+                        backup_retension
                         exit
                 ;;
 
@@ -89,7 +109,7 @@ echo " "
                                         echo " "
                                         sleep 1
                                         /usr/bin/mysqldump -u root --password=$password $dbs | gzip > $BACKUP_PATH_DEFINED/$time/mysql/$dbs.sql.gz
-                                        echo -e $GREEN"Database Backup Completed $BACKUP_PATH_DEFINED/$time/$dbs.sql.gz"$RESET
+                                        echo -e $GREEN"Database Backup Completed $BACKUP_PATH_DEFINED/$time/mysql/$dbs.sql.gz"$RESET
                                         echo " "
                                 else
                                         echo -e $RED"Database Not Found. Please Recheck"$RESET
@@ -106,6 +126,7 @@ echo " "
                         echo " "
                         backup_all_db
                         backup_all_files_uncompressed
+                        backup_retension
                         exit
                 ;;
 
