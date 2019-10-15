@@ -29,6 +29,10 @@ echo -e "$GREEN*****************************************************************
 
 echo " "
 
+BACKUP_PATH_DEFINED=/home/centminmodbackup
+mkdir -p $BACKUP_PATH_DEFINED
+mkdir -p $BACKUP_PATH_DEFINED/$time/mysql
+mkdir -p $BACKUP_PATH_DEFINED/$time/files
 
 
 function backup_all_db
@@ -36,18 +40,15 @@ function backup_all_db
         echo -e $YELLOW"Full Database Backup in Progress"$RESET
         echo " "
         time=$(date +"%m_%d_%Y-%H.%M.%S")
-        mkdir -p /home/backup
-        mkdir -p /home/backup/$time/mysql
-        mkdir -p /home/backup/$time/files
         password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
         dbs=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$')
                 if [ $? = '0' ]; then
                         for db in $dbs; do
                         sleep 1
                         xyz=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$' | wc -l)
-                                        /usr/bin/mysqldump -u root --password=$password $db | gzip > /home/backup/$time/mysql/$db.sql.gz
+                                        /usr/bin/mysqldump -u root --password=$password $db | gzip > $BACKUP_PATH_DEFINED/$time/mysql/$db.sql.gz
                                         x=$((x + 1))
-                                        echo -e $GREEN"Database Backup Completed in /home/backup/$time/mysql/$db.sql.gz"$RESET
+                                        echo -e $GREEN"Database Backup Completed in $BACKUP_PATH_DEFINED/$time/mysql/$db.sql.gz"$RESET
                                         echo " "
                                 done
                 else
@@ -64,9 +65,9 @@ function backup_all_files_uncompressed
 echo " "
 echo -e $GREEN"Making Files Backup"$RESET
 echo " "
-rsync -vr /home/nginx/domains/* /home/backup/$time/files/
+rsync -vr /home/nginx/domains/* $BACKUP_PATH_DEFINED/$time/files/
 echo " "
-echo -e $GREEN"All Files Backup Completed in /home/backup/$time/files/"$RESET
+echo -e $GREEN"All Files Backup Completed in $BACKUP_PATH_DEFINED/$time/files/"$RESET
 echo " "
 }
 
@@ -86,10 +87,11 @@ echo " "
                                 if [ "$dbs" == "$2"  ]; then
                                         echo " "
                                         echo -e $YELLOW"Making Database Backup $dbs"$RESET
-                                        sleep 5
+                                        echo " "
+                                        sleep 1
                                         time=$(date +"%m_%d_%Y-%H.%M.%S")
-                                        /usr/bin/mysqldump -u root --password=$password $dbs | gzip > /home/$dbs-$time.sql.gz
-                                        echo -e $GREEN"Database Backup Completed /home/$dbs-$time.sql.gz"$RESET
+                                        /usr/bin/mysqldump -u root --password=$password $dbs | gzip > $BACKUP_PATH_DEFINED/mysql/$dbs-$time.sql.gz
+                                        echo -e $GREEN"Database Backup Completed $BACKUP_PATH_DEFINED/mysql/$dbs-$time.sql.gz"$RESET
                                         echo " "
                                 else
                                         echo -e $RED"Database Not Found. Please Recheck"$RESET
