@@ -33,6 +33,8 @@ echo " "
 
 function backup_all_db
 {
+        echo -e $YELLOW"Full Database Backup in Progress"$RESET
+        echo " "
         time=$(date +"%m_%d_%Y-%H.%M.%S")
         mkdir -p /home/backup
         mkdir -p /home/backup/$time/mysql
@@ -41,16 +43,13 @@ function backup_all_db
         dbs=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$')
                 if [ $? = '0' ]; then
                         for db in $dbs; do
-                        echo -e $YELLOW"Full Database Backup in Progress"$RESET
-                        sleep 5
+                        sleep 1
                         xyz=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$' | wc -l)
-                                for ((x=1; x<$xyz; x++)); do
                                         /usr/bin/mysqldump -u root --password=$password $db | gzip > /home/backup/$time/mysql/$db.sql.gz
                                         x=$((x + 1))
                                         echo -e $GREEN"Database Backup Completed in /home/backup/$time/mysql/$db.sql.gz"$RESET
                                         echo " "
                                 done
-                        done
                 else
                         echo -e $RED"Database Connection Failed. Please check Your Database Password in /root/.my.cnf File"$RESET
                         echo " "
