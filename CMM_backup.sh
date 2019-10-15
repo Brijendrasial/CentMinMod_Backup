@@ -30,16 +30,15 @@ echo -e "$GREEN*****************************************************************
 echo " "
 
 BACKUP_PATH_DEFINED=/home/centminmodbackup
+time=$(date +"%m_%d_%Y-%H.%M.%S")
 mkdir -p $BACKUP_PATH_DEFINED
 mkdir -p $BACKUP_PATH_DEFINED/$time/mysql
 mkdir -p $BACKUP_PATH_DEFINED/$time/files
-
 
 function backup_all_db
 {
         echo -e $YELLOW"Full Database Backup in Progress"$RESET
         echo " "
-        time=$(date +"%m_%d_%Y-%H.%M.%S")
         password=$(cat /root/.my.cnf | grep password | cut -d' ' -f1 | cut -d'=' -f2)
         dbs=$(mysql -u root --password=$password -B -N -e 'show databases;' | egrep -v '^mysql|_schema$')
                 if [ $? = '0' ]; then
@@ -89,9 +88,8 @@ echo " "
                                         echo -e $YELLOW"Making Database Backup $dbs"$RESET
                                         echo " "
                                         sleep 1
-                                        time=$(date +"%m_%d_%Y-%H.%M.%S")
-                                        /usr/bin/mysqldump -u root --password=$password $dbs | gzip > $BACKUP_PATH_DEFINED/mysql/$dbs-$time.sql.gz
-                                        echo -e $GREEN"Database Backup Completed $BACKUP_PATH_DEFINED/mysql/$dbs-$time.sql.gz"$RESET
+                                        /usr/bin/mysqldump -u root --password=$password $dbs | gzip > $BACKUP_PATH_DEFINED/$time/mysql/$dbs.sql.gz
+                                        echo -e $GREEN"Database Backup Completed $BACKUP_PATH_DEFINED/$time/$dbs.sql.gz"$RESET
                                         echo " "
                                 else
                                         echo -e $RED"Database Not Found. Please Recheck"$RESET
